@@ -1,15 +1,14 @@
 #--- source.hlsl
 
-// Verify handling of unbounded multi-dimensional resource array.
+// Verify handling of unbounded multi-dimensional resource array
+// with NonUniformResourceIndex.
 
 RWStructuredBuffer<int> Buf[][2] : register(u0);
 
 [numthreads(4,2,1)]
 void main(uint3 GTI : SV_GroupThreadID, uint GI : SV_GroupIndex) {
   for (int i = 0; i < 4; i++) {
-    Buf[1][0][i] = Buf[0][0][i] + Buf[0][1][i];
-    Buf[1][1][i] = Buf[0][0][i] * Buf[0][1][i];
-    Buf[0][0][i] += Buf[0][1][i];
+    Buf[NonUniformResourceIndex(GTI.x)][NonUniformResourceIndex(GTI.y)][i] = Buf[NonUniformResourceIndex(GTI.x)][NonUniformResourceIndex(GTI.y)][i] + 100 * GI;
   }
 }
 
@@ -22,21 +21,29 @@ Shaders:
 Buffers:
   - Name: Buf
     Format: Int32
-    ArraySize: 4
+    ArraySize: 8
     Data:
       - [ 0, 1, 2, 3 ]
       - [ 1, 2, 3, 4 ]
       - [ 2, 3, 4, 5 ]
       - [ 3, 4, 5, 6 ]
+      - [ 4, 5, 6, 7 ]
+      - [ 5, 6, 7, 8 ]
+      - [ 6, 7, 8, 9 ]
+      - [ 7, 8, 9, 10 ]
 
   - Name: ExpectedBuf
     Format: Int32
-    ArraySize: 4
+    ArraySize: 8
     Data:
-     - [ 1, 3, 5, 7 ]
-     - [ 1, 2, 3, 4 ]
-     - [ 1, 3, 5, 7 ]
-     - [ 0, 2, 6, 12 ]
+      - [ 0, 1, 2, 3 ]
+      - [ 401, 402, 403, 404 ]
+      - [ 102, 103, 104, 105 ]
+      - [ 503, 504, 505, 506 ]
+      - [ 204, 205, 206, 207 ]
+      - [ 605, 606, 607, 608 ]
+      - [ 306, 307, 308, 309 ]
+      - [ 707, 708, 709, 710 ]
 
 Results:
   - Result: Buf
@@ -55,7 +62,7 @@ DescriptorSets:
 #--- end
 
 # Bug https://github.com/llvm/llvm-project/issues/159679
-# XFAIL: Clang-DXC
+# XFAIL: Clang
 
 # Resource arrays are not yet supported on Metal
 # UNSUPPORTED: Metal

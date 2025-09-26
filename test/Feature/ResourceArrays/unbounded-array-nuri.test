@@ -1,15 +1,14 @@
 #--- source.hlsl
 
-// Verify handling of unbounded multi-dimensional resource array.
+// Verify handling of unbounded resource array with NonUniformResourceIndex.
 
-RWStructuredBuffer<int> Buf[][2] : register(u0);
+[[vk::binding(0)]]
+RWBuffer<int> Buf[] : register(u0);
 
 [numthreads(4,2,1)]
-void main(uint3 GTI : SV_GroupThreadID, uint GI : SV_GroupIndex) {
+void main(uint GI : SV_GroupIndex) {
   for (int i = 0; i < 4; i++) {
-    Buf[1][0][i] = Buf[0][0][i] + Buf[0][1][i];
-    Buf[1][1][i] = Buf[0][0][i] * Buf[0][1][i];
-    Buf[0][0][i] += Buf[0][1][i];
+    Buf[NonUniformResourceIndex(GI)][i] = GI * 100 + Buf[NonUniformResourceIndex(GI)][i];
   }
 }
 
@@ -22,21 +21,29 @@ Shaders:
 Buffers:
   - Name: Buf
     Format: Int32
-    ArraySize: 4
+    ArraySize: 8
     Data:
       - [ 0, 1, 2, 3 ]
       - [ 1, 2, 3, 4 ]
       - [ 2, 3, 4, 5 ]
       - [ 3, 4, 5, 6 ]
+      - [ 4, 5, 6, 7 ]
+      - [ 5, 6, 7, 8 ]
+      - [ 6, 7, 8, 9 ]
+      - [ 7, 8, 9, 10 ]
 
   - Name: ExpectedBuf
     Format: Int32
-    ArraySize: 4
+    ArraySize: 8
     Data:
-     - [ 1, 3, 5, 7 ]
-     - [ 1, 2, 3, 4 ]
-     - [ 1, 3, 5, 7 ]
-     - [ 0, 2, 6, 12 ]
+      - [ 0, 1, 2, 3 ]
+      - [ 101, 102, 103, 104 ]
+      - [ 202, 203, 204, 205 ]
+      - [ 303, 304, 305, 306 ]
+      - [ 404, 405, 406, 407 ]
+      - [ 505, 506, 507, 508 ]
+      - [ 606, 607, 608, 609 ]
+      - [ 707, 708, 709, 710 ]
 
 Results:
   - Result: Buf
@@ -47,21 +54,20 @@ Results:
 DescriptorSets:
   - Resources:
     - Name: Buf
-      Kind: RWStructuredBuffer
+      Kind: RWBuffer
       DirectXBinding:
         Register: 0
         Space: 0
+      VulkanBinding:
+        Binding: 0
 ...
 #--- end
 
 # Bug https://github.com/llvm/llvm-project/issues/159679
-# XFAIL: Clang-DXC
+# XFAIL: Clang
 
 # Resource arrays are not yet supported on Metal
 # UNSUPPORTED: Metal
-
-# Vulkan does not support multi-dimensional resource arrays
-# UNSUPPORTED: Vulkan
 
 # RUN: split-file %s %t
 # RUN: %dxc_target -T cs_6_0 -Fo %t.o %t/source.hlsl
